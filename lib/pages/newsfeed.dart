@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_page.dart';
 import 'package:gismultiinstancetestingenvironment/pages/index.dart';
+import 'package:gismultiinstancetestingenvironment/pages/mapboxmap/mapboxmappage.dart';
+import 'package:gismultiinstancetestingenvironment/pages/profilepage.dart';
 import 'package:gismultiinstancetestingenvironment/pages/riverbasin.dart';
-import 'package:gismultiinstancetestingenvironment/pages/mappage.dart';
+
 import 'package:gismultiinstancetestingenvironment/pages/emerg.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_service_supa.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_model.dart';
@@ -228,24 +230,24 @@ class _NewsFeedState extends State<NewsFeed> {
           ),
           ListTile(
             leading: Icon(Icons.settings),
-            title: Text('Account Settings'),
+            title: Text('Profile Settings'),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => RiverBasinPage(),
+                  builder: (context) => MyProfilePage(),
                 ),
               );
             },
           ),
           ListTile(
             leading: Icon(Icons.map_rounded),
-            title: Text('Area Map'),
+            title: Text('Jade Valley Area Map'),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AreaMapPage(),
+                  builder: (context) => MapPage(),
                 ),
               );
             },

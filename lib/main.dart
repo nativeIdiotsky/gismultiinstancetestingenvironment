@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'package:flutter/services.dart';
+import 'package:gismultiinstancetestingenvironment/pages/profilepage.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -14,9 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gismultiinstancetestingenvironment/pages/emerg.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_page.dart';
 import 'package:gismultiinstancetestingenvironment/pages/index.dart';
-import 'package:gismultiinstancetestingenvironment/pages/mapbox.dart';
-import 'package:gismultiinstancetestingenvironment/pages/mapboxhand.dart';
-import 'package:gismultiinstancetestingenvironment/pages/mappage.dart';
+
 import 'package:gismultiinstancetestingenvironment/pages/newsfeed.dart';
 import 'package:gismultiinstancetestingenvironment/pages/riverbasin.dart';
 
@@ -45,6 +44,9 @@ void main() async {
     url: SupabaseUrl,
     anonKey: SupabaseAnonKey,
   );
+
+  // ✅ Initialize Mapbox Maps
+  await setupMapBox();
 
   // ✅ Initialize Local Notifications
   _setupLocalNotifications();
@@ -141,13 +143,14 @@ Future<void> _showLocalNotification(RemoteMessage message) async {
 }
 
 /// ✅ Setup Mapbox Access Token
-Future<void> setup() async {
+Future<void> setupMapBox() async {
   try {
     await dotenv.load(fileName: 'assets/.env'); // Ensure correct path
 
     if (dotenv.env['MAPBOX_ACCESS_TOKEN'] != null &&
         dotenv.env['MAPBOX_ACCESS_TOKEN']!.isNotEmpty) {
       print('✅ .env Loaded Successfully');
+      print('🔍 MAPBOX_ACCESS_TOKEN: ${dotenv.env['MAPBOX_ACCESS_TOKEN']}');
       MapboxOptions.setAccessToken(dotenv.env['MAPBOX_ACCESS_TOKEN']!);
     } else {
       print('❌ Mapbox Access Token not found!');

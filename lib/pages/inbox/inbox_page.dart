@@ -45,7 +45,7 @@ class _InboxPageState extends State<InboxPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final itemHeight = screenWidth * 0.15;
+    final itemHeight = screenWidth * 0.2;
 
     return Scaffold(
       appBar: AppBar(

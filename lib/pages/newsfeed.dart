@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:gismultiinstancetestingenvironment/pages/createpost.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_page.dart';
 import 'package:gismultiinstancetestingenvironment/pages/index.dart';
 import 'package:gismultiinstancetestingenvironment/pages/mapboxmap/mapboxmappage.dart';
 import 'package:gismultiinstancetestingenvironment/pages/profilepage.dart';
 import 'package:gismultiinstancetestingenvironment/pages/riverbasin.dart';
-
+import 'package:gismultiinstancetestingenvironment/pages/newsfeed/post_card.dart';
+import 'package:gismultiinstancetestingenvironment/pages/newsfeed/post_list.dart';
 import 'package:gismultiinstancetestingenvironment/pages/emerg.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_service_supa.dart';
 import 'package:gismultiinstancetestingenvironment/pages/inbox/inbox_model.dart';
@@ -22,11 +24,13 @@ class _NewsFeedState extends State<NewsFeed> {
   bool _isMounted = false; // ✅ Track widget state
   String? username = "Loading...";
   String? email = "Loading...";
+  late Future<void> _refreshFuture;
   @override
   void initState() {
     super.initState();
     _isMounted = true; // ✅ Mark as mounted
-    _setupNotifications();
+    _refreshFuture = _fetchUserDetails();
+    //   _setupNotifications();
     _fetchUserDetails();
   }
 
@@ -125,61 +129,6 @@ class _NewsFeedState extends State<NewsFeed> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        backgroundColor: Color(0xFF213A57),
-        title: Text(
-          'Home',
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 22,
-            color: Colors.white,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.menu, color: Colors.white),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {
-              _showNotificationList(); // ✅ Open notification list
-            },
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildPostCreateSection(),
-            SizedBox(height: 20),
-            _buildPostCard(
-              name: 'Who Dini',
-              timeAgo: '5 hours ago',
-              content: 'Baha na jud guys',
-              hasMedia: true,
-            ),
-            SizedBox(height: 20),
-            _buildPostCard(
-              name: 'John Doe',
-              timeAgo: '2 hours ago',
-              content: 'Pwede pud no pics just text.',
-              hasMedia: false,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: ListView(
@@ -267,21 +216,18 @@ class _NewsFeedState extends State<NewsFeed> {
   Widget _buildPostCreateSection() {
     return Column(
       children: [
-        TextField(
-          decoration: InputDecoration(
-            suffixIcon: Icon(Icons.clear),
-            hintText: 'Type something here',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15.0),
-            ),
-          ),
-        ),
-        SizedBox(height: 10),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CreatePostScreen(),
+              ),
+            );
+          },
           icon: Icon(Icons.photo, color: Colors.black),
           label: Text(
-            'Photo',
+            'Create a Post',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -316,53 +262,41 @@ class _NewsFeedState extends State<NewsFeed> {
     }
   }
 
-  Widget _buildPostCard({
-    required String name,
-    required String timeAgo,
-    required String content,
-    required bool hasMedia,
-  }) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  Future<void> _refreshPosts() async {
+    setState(() {
+      _refreshFuture = _fetchUserDetails();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: _scaffoldKey,
+      appBar: AppBar(
+        title: Text('News Feed'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications),
+            onPressed: _showNotificationList,
+          ),
+        ],
       ),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      drawer: _buildDrawer(context),
+      body: RefreshIndicator(
+        onRefresh: _refreshPosts, // Call the refresh function
+        child: FutureBuilder(
+          future: _refreshFuture, // Ensure data is loaded
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+            return ListView(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey[300],
-                ),
-                SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(timeAgo),
-                  ],
-                ),
-                Spacer(),
-                IconButton(
-                  icon: Icon(Icons.more_vert),
-                  onPressed: () {},
-                ),
+                _buildPostCreateSection(),
+                PostList(), // Assuming PostList() displays posts
               ],
-            ),
-            if (hasMedia) Container(height: 150, color: Colors.grey[300]),
-            SizedBox(height: 16),
-            Text(content),
-          ],
+            );
+          },
         ),
       ),
     );

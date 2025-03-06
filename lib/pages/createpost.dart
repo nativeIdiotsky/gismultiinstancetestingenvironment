@@ -1,171 +1,168 @@
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:gismultiinstancetestingenvironment/pages/index.dart';
+import 'package:gismultiinstancetestingenvironment/pages/newsfeed.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
-class CreatePost extends StatefulWidget {
+final supabase = Supabase.instance.client;
+
+class CreatePostScreen extends StatefulWidget {
   @override
-  _CreatePostState createState() => _CreatePostState();
+  _CreatePostScreenState createState() => _CreatePostScreenState();
 }
 
-class _CreatePostState extends State<CreatePost> {
-  final _postHeaderController = TextEditingController();
-  final _postBodyController = TextEditingController();
-  final SupabaseClient supabase = Supabase.instance.client;
+class _CreatePostScreenState extends State<CreatePostScreen> {
+  final TextEditingController _headerController = TextEditingController();
+  final TextEditingController _bodyController = TextEditingController();
+  File? _image;
+  final ImagePicker _picker = ImagePicker();
 
-  bool _isLoading = true;
-  String? _username;
-  List<dynamic> _posts = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUserData();
-  }
-
-  Future<void> _fetchUserData() async {
-    final User? user = supabase.auth.currentUser;
-    final Map<String, dynamic>? metadata = user?.userMetadata;
-
-    if (user != null) {
-      final postData = await supabase
-          .from('posts')
-          .select('posted_at, post_header, post_body')
-          .eq('user_id', user.id)
-          .order('posted_at', ascending: false);
-
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
       setState(() {
-        if (metadata != null) {
-          _username = metadata['display_name'];
-        }
-        _posts = postData as List<dynamic>;
-        _isLoading = false;
+        _image = File(pickedFile.path);
       });
     }
   }
 
-  Future<void> _submitPost() async {
-    final User? user = supabase.auth.currentUser;
-    final currentContext = context;
-    final header = _postHeaderController.text.trim();
-    final body = _postBodyController.text.trim();
+  Future<void> _uploadPost() async {
+    if (_image == null ||
+        _headerController.text.isEmpty ||
+        _bodyController.text.isEmpty) {
+      _showAlertDialog(
+          'Error', 'Please fill in all fields and select an image.');
+      return;
+    }
 
-    if (user != null) {
-      await supabase.from('posts').insert(
-        {
-          'user_id': user.id,
-          'post_header': header,
-          'post_body': body,
-        },
-      );
-      if (currentContext.mounted) {
-        ScaffoldMessenger.of(currentContext).showSnackBar(
-          const SnackBar(
-            content: Text('Post successfully posted.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        _showAlertDialog('Error', 'User not authenticated.');
+        return;
       }
+
+      final fileName = const Uuid().v4();
+      final storagePath = 'posts/$fileName.jpg';
+
+      // Upload the image
+      final uploadResponse = await supabase.storage
+          .from('post-images')
+          .upload(storagePath, _image!);
+
+      print('Upload Response: $uploadResponse'); // Debug log
+
+      // If uploadResponse is null or empty, fail gracefully
+      if (uploadResponse == null || uploadResponse.isEmpty) {
+        _showAlertDialog('Error', 'Image upload failed.');
+        return;
+      }
+
+      // Get the public URL of the uploaded image
+      final imageUrl =
+          supabase.storage.from('post-images').getPublicUrl(storagePath);
+
+      print('Image URL: $imageUrl'); // Debug log
+
+      // Insert the post into the database
+      final response = await supabase.from('posts').insert({
+        'user_id': userId,
+        'post_header': _headerController.text,
+        'post_body': _bodyController.text,
+        'post_image_url': imageUrl,
+        'area_coordinates': null, // Keeping this field blank
+      });
+
+      print('Insert Response: $response'); // Debug log
+
+      // Check if insert was successful
+      if (response == null ||
+          (response is Map && response.containsKey('error'))) {
+        _showAlertDialog(
+          'Success',
+          'Post uploaded successfully.',
+          dismissible: true,
+        );
+
+        _headerController.clear();
+        _bodyController.clear();
+        setState(() => _image = null);
+
+        // ✅ Navigate back to NewsFeed after success
+        Future.delayed(Duration(seconds: 1), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => NewsFeed()),
+          );
+        });
+      } else {
+        _showAlertDialog(
+          'Error',
+          'An error occurred. Please try again.',
+          dismissible: true,
+        );
+
+        _headerController.clear();
+        _bodyController.clear();
+        setState(() => _image = null);
+      }
+    } catch (e) {
+      print('Upload Exception: $e');
+      _showAlertDialog('Error', 'Failed to upload post: $e');
     }
-    _fetchUserData();
   }
 
-  Future<void> _signOut() async {
-    final currentContext = context;
-    await supabase.auth.signOut();
-
-    if (currentContext.mounted) {
-      Navigator.push(
-        currentContext,
-        MaterialPageRoute(
-          builder: (context) => const Index(),
-        ),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _postHeaderController.dispose();
-    _postBodyController.dispose();
-    super.dispose();
+  void _showAlertDialog(String title, String message,
+      {bool dismissible = false}) {
+    showDialog(
+      context: context,
+      barrierDismissible: dismissible,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Posts Page'),
-      ),
+      appBar: AppBar(title: const Text('Create Post')),
       body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator())
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  // Display the username
-                  Text(
-                    'Hello, ${_username ?? 'User'}',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Input fields for post creation
-                  TextField(
-                    controller: _postHeaderController,
-                    decoration: InputDecoration(labelText: 'Set a header'),
-                  ),
-                  SizedBox(height: 20),
-                  TextField(
-                    controller: _postBodyController,
-                    decoration:
-                        InputDecoration(labelText: 'What\'s on your mind'),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Buttons for submitting and signing out
-                  ElevatedButton(
-                    onPressed: _submitPost,
-                    child: Text('Submit'),
-                  ),
-                  ElevatedButton(
-                    onPressed: _signOut,
-                    child: Text('Sign Out'),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Display the user's posts
-                  Expanded(
-                    child: _posts.isEmpty
-                        ? Text('No posts yet')
-                        : ListView.builder(
-                            itemCount: _posts.length,
-                            itemBuilder: (context, index) {
-                              final post = _posts[index];
-                              return Card(
-                                margin: EdgeInsets.symmetric(vertical: 10),
-                                child: ListTile(
-                                  title: Text(post['post_header']),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(post['post_body']),
-                                      SizedBox(height: 5),
-                                      Text(
-                                        'Posted at: ${post['posted_at']}',
-                                        style: TextStyle(
-                                            fontSize: 12, color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _headerController,
+              decoration: const InputDecoration(labelText: 'Post Header'),
+            ),
+            TextField(
+              controller: _bodyController,
+              decoration: const InputDecoration(labelText: 'Post Description'),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 10),
+            _image != null
+                ? Image.file(_image!, height: 150)
+                : const Text('No image selected'),
+            ElevatedButton(
+              onPressed: _pickImage,
+              child: const Text('Pick Image'),
+            ),
+            ElevatedButton(
+              onPressed: _uploadPost,
+              child: const Text('Upload Post'),
+            ),
+          ],
+        ),
       ),
     );
   }
